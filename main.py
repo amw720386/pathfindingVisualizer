@@ -4,7 +4,6 @@ import time
 import screeninfo
 import sys
 import heapq
-from typing import List, Tuple, Dict
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -27,6 +26,7 @@ BLACK = (0,0,0)
 RED = (255,0,0)
 GREY = (128,128,128)
 GREEN = (0,255,0)
+BLUE = (0,0,255)
 
 class Avatar:
     def __init__(self, start_x, start_y):
@@ -85,6 +85,7 @@ class Block:
         self.hover_rect = pygame.Surface((scaled_block_width, scaled_block_height))
         self.hover_rect.set_alpha(128)
         self.hover_rect.fill((255,255,255))
+        self.pathUse = False
 
     def draw(self, screen):
         pygame.draw.rect(screen,WHITE,self.border_rect)
@@ -94,6 +95,8 @@ class Block:
             pygame.draw.rect(screen,GREEN,self.inner_rect)
         if self.type == 3: #weighted
             pygame.draw.rect(screen,GREY,self.inner_rect)
+        if self.pathUse:
+            pygame.draw.rect(screen,BLUE,self.inner_rect)
         if self.hover:
             screen.blit(self.hover_rect,(self.renderx, self.rendery))
 
@@ -147,8 +150,6 @@ def astar(grid, start, goal):
                     if new_position in closed_list:
                         continue
 
-                    print(new_position)
-
                     neighbor_node = Node(new_position, current_node)
 
                     neighbor_node.g = current_node.g + 1
@@ -160,10 +161,9 @@ def astar(grid, start, goal):
 
     return []  
 
-
-map = Map(16,9) #OUTER IS NON EXLCUSIVE I.E 512 and 288 or 256 and 144
+map = Map(256,144) #OUTER IS NON EXLCUSIVE I.E 512 and 288 or 256 and 144
 player = Avatar(2,2)
-goal = Goal(14,4)
+goal = Goal(79,12)
 
 while True:
     keys = pygame.key.get_pressed()
@@ -173,21 +173,28 @@ while True:
             pygame.display.quit()
             pygame.quit()
             sys.exit()
-    if keys[K_z]:            
+
+    if keys[K_z]:         
+        try:
+            for position in path:
+                map.render[position[1]][position[0]].pathUse = False 
+        except:
+            pass
+
         path = astar(map.render, (player.x,player.y), (goal.x,goal.y))
-        print("Path:", path)
+
+        for position in path:
+            map.render[position[1]][position[0]].pathUse = True 
 
     if pygame.mouse.get_pos()[0] > 0 and pygame.mouse.get_pos()[0] < screen_width:
         if pygame.mouse.get_pos()[1] > 0 and pygame.mouse.get_pos()[1] < screen_height:
             mouse_pos_x = int(pygame.mouse.get_pos()[0]/scaled_block_width)
             mouse_pos_y = int(pygame.mouse.get_pos()[1]/scaled_block_height)
             map.render[mouse_pos_y][mouse_pos_x].hover = True
-            for event in event_list:
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if event.button == 1:
-                        map.render[mouse_pos_y][mouse_pos_x].type = 2
-                    if event.button == 3:
-                        map.render[mouse_pos_y][mouse_pos_x].type = 1
+            if pygame.mouse.get_pressed()[0]:
+                map.render[mouse_pos_y][mouse_pos_x].type = 2
+            if pygame.mouse.get_pressed()[2]:
+                map.render[mouse_pos_y][mouse_pos_x].type = 1
 
     for row in map.render:
         for column in row:
@@ -196,6 +203,7 @@ while True:
 
     player.draw(screen)
     goal.draw(screen)
+
 
     pygame.display.flip()
     screen.fill(WHITE)
