@@ -3,7 +3,8 @@ from pygame.locals import *
 import time
 import screeninfo
 import sys
-import collections
+import heapq
+from typing import List, Tuple, Dict
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -87,11 +88,11 @@ class Block:
 
     def draw(self, screen):
         pygame.draw.rect(screen,WHITE,self.border_rect)
-        if self.type == 1:
+        if self.type == 1: #walkable
             pygame.draw.rect(screen,BLACK,self.inner_rect)
-        if self.type == 2:
+        if self.type == 2: #wall
             pygame.draw.rect(screen,GREEN,self.inner_rect)
-        if self.type == 3:
+        if self.type == 3: #weighted
             pygame.draw.rect(screen,GREY,self.inner_rect)
         if self.hover:
             screen.blit(self.hover_rect,(self.renderx, self.rendery))
@@ -104,33 +105,77 @@ def defineRatios(x,y):
     global border_width
     border_width = round(scaled_block_height/40) + 0.01
 
-class aStar:
-    class Qeue:
-        def __init__(self):
-            self.elements = collections.deque()
-        
-        def empty(self) -> bool:
-            return not self.elements
-        
-        def put(self, x):
-            self.elements.append(x)
-        
-        def get(self):
-            return self.elements.popleft() 
+class Node:
+    def __init__(self, position, parent=None):
+        self.position = position
+        self.parent = parent
+        self.g = 0 
+        self.h = 0  
+        self.f = 0  
 
+    def __lt__(self, other):
+        return self.f < other.f
+
+def astar(grid, start, goal):
+    start_node = Node(start)
+    goal_node = Node(goal)
+
+    open_list = []
+    closed_list = set()
+
+    heapq.heappush(open_list, start_node)
+    
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
+
+    while open_list:
+        current_node = heapq.heappop(open_list)
+
+        if current_node.position == goal_node.position:
+            path = []
+            while current_node:
+                path.append(current_node.position)
+                current_node = current_node.parent
+            return path[::-1]  
+
+        closed_list.add(current_node.position)
+
+        for direction in directions:
+            new_position = (current_node.position[0] + direction[0], current_node.position[1] + direction[1])
+
+            if (0 <= new_position[0] < len(grid[0]) and 0 <= new_position[1] < len(grid)):
+                if grid[new_position[1]][new_position[0]].type == 1:  
+                    if new_position in closed_list:
+                        continue
+
+                    print(new_position)
+
+                    neighbor_node = Node(new_position, current_node)
+
+                    neighbor_node.g = current_node.g + 1
+                    neighbor_node.h = abs(neighbor_node.position[1] - goal_node.position[1]) + abs(neighbor_node.position[0] - goal_node.position[0])
+                    neighbor_node.f = neighbor_node.g + neighbor_node.h
+
+                    if all(neighbor_node.f < node.f for node in open_list if node.position == neighbor_node.position):
+                        heapq.heappush(open_list, neighbor_node)
+
+    return []  
 
 
 map = Map(16,9) #OUTER IS NON EXLCUSIVE I.E 512 and 288 or 256 and 144
-player = Avatar(1,1)
-goal = Goal(12,7)
+player = Avatar(2,2)
+goal = Goal(14,4)
 
 while True:
+    keys = pygame.key.get_pressed()
     event_list = pygame.event.get()
     for event in event_list:
         if event.type == pygame.QUIT:
             pygame.display.quit()
             pygame.quit()
             sys.exit()
+    if keys[K_z]:            
+        path = astar(map.render, (player.x,player.y), (goal.x,goal.y))
+        print("Path:", path)
 
     if pygame.mouse.get_pos()[0] > 0 and pygame.mouse.get_pos()[0] < screen_width:
         if pygame.mouse.get_pos()[1] > 0 and pygame.mouse.get_pos()[1] < screen_height:
